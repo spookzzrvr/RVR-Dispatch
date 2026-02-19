@@ -148,17 +148,30 @@ client.on('interactionCreate', async (interaction) => {
       ? `${driver}, de dispatch heeft een opdracht voor je. Rij deze rit! 🚛`
       : `Nieuwe dispatch opdracht! 🚛`;
 
-    const embed = new EmbedBuilder()
-      .setTitle("🚛 RVR Dispatch")
-      .setDescription(intro)
-      .addFields(
-        { name: "📍 Vertrekland", value: locatie, inline: false },
-        { name: "📏 Lengte", value: `${lengthInfo.label} — ${lengthInfo.distance}`, inline: true },
-        { name: "🚛 Trailer", value: trailerText, inline: true }
-      )
-      .setFooter({ text: "Zoek in ETS2 een job die hier zo dicht mogelijk bij aansluit." });
+const dispatchNumber = Math.floor(1000 + Math.random() * 9000);
 
-    await interaction.reply({ embeds: [embed] });
+const embed = new EmbedBuilder()
+  .setColor("#E63D10")
+  .setTitle("📻 RVR DISPATCH CENTRALE")
+  .setDescription(
+    driver
+      ? `🔔 ${driver}, u bent toegewezen aan dispatch **#${dispatchNumber}**.\nGelieve onderstaande rit uit te voeren.`
+      : `🔔 Nieuwe dispatch aangemaakt.\nReferentie: **#${dispatchNumber}**`
+  )
+  .addFields(
+    {
+      name: "━━━━━━━━━━━━━━━━━━",
+      value: "**Ritgegevens**",
+      inline: false
+    },
+    { name: "📍 Vertrekland", value: `**${locatie}**`, inline: false },
+    { name: "📏 Afstand", value: `${lengthInfo.label} — ${lengthInfo.distance}`, inline: true },
+    { name: "🚛 Trailer", value: trailerText, inline: true }
+  )
+  .setFooter({
+    text: "RVR Transport • ProMods & DLC • Veilig rijden staat voorop"
+  })
+  .setTimestamp();
   }
 });
 
