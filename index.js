@@ -6,62 +6,66 @@ const {
   GatewayIntentBits,
   SlashCommandBuilder,
   Routes,
-  EmbedBuilder
+  EmbedBuilder,
 } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
-});
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// 📁 Laad landen uit locations.json
+// ---- Load locations ----
 const locationsPath = path.join(__dirname, 'locations.json');
-const LOCATIONS = JSON.parse(fs.readFileSync(locationsPath, 'utf8'));
+let LOCATIONS = [];
+try {
+  LOCATIONS = JSON.parse(fs.readFileSync(locationsPath, 'utf8'));
+  if (!Array.isArray(LOCATIONS) || LOCATIONS.length === 0) throw new Error('locations.json leeg/ongeldig');
+} catch (e) {
+  console.error('❌ locations.json fout:', e.message);
+  LOCATIONS = ['België', 'Nederland'];
+}
+
+const RVR_COLOR = '#E63D10';
 
 const lengths = {
-  kort: { label: "Kort", distance: "0–400 km" },
-  midden: { label: "Midden", distance: "400–900 km" },
-  lang: { label: "Lang", distance: "900+ km" }
+  kort: { label: 'Kort', distance: '0-400 km' },
+  midden: { label: 'Midden', distance: '400-900 km' },
+  lang: { label: 'Lang', distance: '900+ km' },
 };
 
 const trailerTypes = {
-  standaard: "Standaard (Box / Huif)",
-  curtainsider: "Huiftrailer (Curtainsider)",
-  box: "Gesloten trailer (Box)",
-  ekeri: "Ekeri / Volume",
-  reefer: "Koeltrailer (Reefer)",
-  container: "Container chassis",
-  flatbed: "Plateau (Flatbed)",
-  lowbed: "Dieplader (Lowbed)",
-  tanker: "Tank trailer"
+  standaard: 'Standaard (Box / Huif)',
+  curtainsider: 'Huiftrailer (Curtainsider)',
+  box: 'Gesloten trailer (Box)',
+  ekeri: 'Ekeri / Volume',
+  reefer: 'Koeltrailer (Reefer)',
+  container: 'Container chassis',
+  flatbed: 'Plateau (Flatbed)',
+  lowbed: 'Dieplader (Lowbed)',
+  tanker: 'Tank trailer',
 };
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// 📌 Slash commands
-const commands = [
-
-  new SlashCommandBuilder()
+// ---- Commands ----
+const dispatchCommand = new SlashCommandBuilder()
   .setName('dispatch')
   .setDescription('Geef een chauffeur een RVR dispatch')
 
-  // ✅ REQUIRED FIRST
-  .addStringOption(option =>
-    option.setName('lengte')
-      .setDescription('Lengte van de rit')
+  // ✅ JOUW GEWENSTE VOLGORDE (allemaal required)
+  .addUserOption(opt =>
+    opt.setName('chauffeur')
+      .setDescription('Tag de chauffeur die deze dispatch krijgt')
       .setRequired(true)
-      .addChoices(
-        { name: 'Random', value: 'random' },
-        { name: 'Kort (0-400 km)', value: 'kort' },
-        { name: 'Midden (400-900 km)', value: 'midden' },
-        { name: 'Lang (900+ km)', value: 'lang' }
-      )
   )
-
-  .addStringOption(option =>
-    option.setName('trailer')
+  .addStringOption(opt =>
+    opt.setName('land')
+      .setDescription('Kies een land (autocomplete) of kies Random')
+      .setRequired(true)
+      .setAutocomplete(true)
+  )
+  .addStringOption(opt =>
+    opt.setName('trailer')
       .setDescription('Welke trailer wil je rijden?')
       .setRequired(true)
       .addChoices(
@@ -77,103 +81,99 @@ const commands = [
         { name: 'Tank', value: 'tanker' }
       )
   )
+  .addStringOption(opt =>
+    opt.setName('lengte')
+      .setDescription('Lengte van de rit')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Random', value: 'random' },
+        { name: 'Kort', value: 'kort' },
+        { name: 'Midden', value: 'midden' },
+        { name: 'Lang', value: 'lang' }
+      )
+  );
 
-  // 🔽 OPTIONAL AFTER
-  .addUserOption(option =>
-    option.setName('driver')
-      .setDescription('Tag een chauffeur (optioneel)')
-      .setRequired(false)
-  )
+const statusCommand = new SlashCommandBuilder()
+  .setName('status')
+  .setDescription('Controleer of de RVR Dispatch Bot online is.');
 
-  .addStringOption(option =>
-    option.setName('locatie')
-      .setDescription('Typ een land (autocomplete) of laat leeg voor Random')
-      .setRequired(false)
-      .setAutocomplete(true)
-  )
-];
+const commands = [dispatchCommand, statusCommand];
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
-// 📌 Registreer slash commands
 (async () => {
   await rest.put(
     Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-    { body: commands.map(command => command.toJSON()) }
+    { body: commands.map(c => c.toJSON()) }
   );
-  console.log("✅ Slash commands geregistreerd.");
+  console.log('✅ Slash commands geregistreerd.');
 })();
 
-// 📌 Interaction handler
+// ---- Interaction handler ----
 client.on('interactionCreate', async (interaction) => {
-
-  // 🔎 Autocomplete
+  // Autocomplete for land
   if (interaction.isAutocomplete()) {
     if (interaction.commandName !== 'dispatch') return;
 
-    const focusedValue = interaction.options.getFocused().toLowerCase();
+    const focused = interaction.options.getFocused(true);
+    if (focused.name !== 'land') return;
 
-    const filtered = LOCATIONS
-      .filter(loc => loc.toLowerCase().includes(focusedValue))
-      .slice(0, 25);
+    const query = (focused.value || '').toString().toLowerCase().trim();
 
-    await interaction.respond(
-      filtered.map(loc => ({ name: loc, value: loc }))
-    );
-    return;
+    // Voeg "Random" altijd toe als bovenste suggestie
+    const suggestions = [];
+
+    // Als user niks typt: zet Random + eerste 24 landen
+    if (!query) {
+      suggestions.push({ name: 'Random (willekeurig land)', value: '__random__' });
+      LOCATIONS.slice(0, 24).forEach(l => suggestions.push({ name: l, value: l }));
+      return interaction.respond(suggestions.slice(0, 25));
+    }
+
+    // Als user wél typt: Random alleen tonen als het matcht op "ran"
+    if ('random'.includes(query) || 'willekeurig'.includes(query)) {
+      suggestions.push({ name: 'Random (willekeurig land)', value: '__random__' });
+    }
+
+    const results = LOCATIONS
+      .filter(l => l.toLowerCase().includes(query))
+      .slice(0, 25 - suggestions.length)
+      .map(l => ({ name: l, value: l }));
+
+    return interaction.respond([...suggestions, ...results].slice(0, 25));
   }
 
   if (!interaction.isChatInputCommand()) return;
 
-  // 🟢 Status command
   if (interaction.commandName === 'status') {
-    await interaction.reply("🟢 RVR Dispatch Bot is online en operationeel.");
-    return;
+    return interaction.reply('🟢 RVR Dispatch Bot is online en operationeel.');
   }
 
-  // 🚛 Dispatch command
   if (interaction.commandName === 'dispatch') {
-
-    const driver = interaction.options.getUser('driver');
-    let locatie = interaction.options.getString('locatie');
-    let lengte = interaction.options.getString('lengte');
+    const chauffeur = interaction.options.getUser('chauffeur');
+    let land = interaction.options.getString('land');
     let trailer = interaction.options.getString('trailer');
+    let lengte = interaction.options.getString('lengte');
 
-    if (!locatie) locatie = pick(LOCATIONS);
-    if (lengte === "random") lengte = pick(Object.keys(lengths));
-    if (trailer === "random") trailer = pick(Object.keys(trailerTypes));
+    if (land === '__random__') land = pick(LOCATIONS);
+    if (trailer === 'random') trailer = pick(Object.keys(trailerTypes));
+    if (lengte === 'random') lengte = pick(Object.keys(lengths));
 
-    const lengthInfo = lengths[lengte];
-    const trailerText = trailerTypes[trailer];
+    const dispatchNumber = Math.floor(1000 + Math.random() * 9000);
 
-    const intro = driver
-      ? `${driver}, de dispatch heeft een opdracht voor je. Rij deze rit! 🚛`
-      : `Nieuwe dispatch opdracht! 🚛`;
+    const embed = new EmbedBuilder()
+      .setColor(RVR_COLOR)
+      .setTitle('📻 RVR DISPATCH CENTRALE')
+      .setDescription(`🔔 ${chauffeur}, u bent toegewezen aan dispatch **#${dispatchNumber}**.\nGelieve onderstaande rit uit te voeren.`)
+      .addFields(
+        { name: '📍 Vertrekland', value: `**${land}**`, inline: false },
+        { name: '🚛 Trailer', value: trailerTypes[trailer], inline: true },
+        { name: '📏 Afstand', value: `${lengths[lengte].label} — ${lengths[lengte].distance}`, inline: true }
+      )
+      .setFooter({ text: 'RVR Transport • ProMods & DLC • Veilig rijden staat voorop' })
+      .setTimestamp();
 
-const dispatchNumber = Math.floor(1000 + Math.random() * 9000);
-
-const embed = new EmbedBuilder()
-  .setColor("#E63D10")
-  .setTitle("📻 RVR DISPATCH CENTRALE")
-  .setDescription(
-    driver
-      ? `🔔 ${driver}, u bent toegewezen aan dispatch **#${dispatchNumber}**.\nGelieve onderstaande rit uit te voeren.`
-      : `🔔 Nieuwe dispatch aangemaakt.\nReferentie: **#${dispatchNumber}**`
-  )
-  .addFields(
-    {
-      name: "━━━━━━━━━━━━━━━━━━",
-      value: "**Ritgegevens**",
-      inline: false
-    },
-    { name: "📍 Vertrekland", value: `**${locatie}**`, inline: false },
-    { name: "📏 Afstand", value: `${lengthInfo.label} — ${lengthInfo.distance}`, inline: true },
-    { name: "🚛 Trailer", value: trailerText, inline: true }
-  )
-  .setFooter({
-    text: "RVR Transport • ProMods & DLC • Veilig rijden staat voorop"
-  })
-  .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
   }
 });
 
