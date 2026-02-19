@@ -44,51 +44,53 @@ function pick(arr) {
 const commands = [
 
   new SlashCommandBuilder()
-    .setName('dispatch')
-    .setDescription('Geef een chauffeur een RVR dispatch')
-    .addUserOption(option =>
-      option.setName('driver')
-        .setDescription('Tag een chauffeur (optioneel)')
-        .setRequired(false)
-    )
-    .addStringOption(option =>
-      option.setName('locatie')
-        .setDescription('Typ een land (autocomplete) of laat leeg voor Random')
-        .setRequired(false)
-        .setAutocomplete(true)
-    )
-    .addStringOption(option =>
-      option.setName('lengte')
-        .setDescription('Lengte van de rit')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Random', value: 'random' },
-          { name: 'Kort (0-400 km)', value: 'kort' },
-          { name: 'Midden (400-900 km)', value: 'midden' },
-          { name: 'Lang (900+ km)', value: 'lang' }
-        )
-    )
-    .addStringOption(option =>
-      option.setName('trailer')
-        .setDescription('Welke trailer wil je rijden?')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Random', value: 'random' },
-          { name: 'Standaard', value: 'standaard' },
-          { name: 'Huiftrailer', value: 'curtainsider' },
-          { name: 'Gesloten', value: 'box' },
-          { name: 'Ekeri / Volume', value: 'ekeri' },
-          { name: 'Koeltrailer', value: 'reefer' },
-          { name: 'Container', value: 'container' },
-          { name: 'Plateau', value: 'flatbed' },
-          { name: 'Dieplader', value: 'lowbed' },
-          { name: 'Tank', value: 'tanker' }
-        )
-    ),
+  .setName('dispatch')
+  .setDescription('Geef een chauffeur een RVR dispatch')
 
-  new SlashCommandBuilder()
-    .setName('status')
-    .setDescription('Controleer of de RVR Dispatch Bot online is.')
+  // ✅ REQUIRED FIRST
+  .addStringOption(option =>
+    option.setName('lengte')
+      .setDescription('Lengte van de rit')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Random', value: 'random' },
+        { name: 'Kort (0-400 km)', value: 'kort' },
+        { name: 'Midden (400-900 km)', value: 'midden' },
+        { name: 'Lang (900+ km)', value: 'lang' }
+      )
+  )
+
+  .addStringOption(option =>
+    option.setName('trailer')
+      .setDescription('Welke trailer wil je rijden?')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Random', value: 'random' },
+        { name: 'Standaard', value: 'standaard' },
+        { name: 'Huif', value: 'curtainsider' },
+        { name: 'Box', value: 'box' },
+        { name: 'Ekeri', value: 'ekeri' },
+        { name: 'Koel', value: 'reefer' },
+        { name: 'Container', value: 'container' },
+        { name: 'Plateau', value: 'flatbed' },
+        { name: 'Dieplader', value: 'lowbed' },
+        { name: 'Tank', value: 'tanker' }
+      )
+  )
+
+  // 🔽 OPTIONAL AFTER
+  .addUserOption(option =>
+    option.setName('driver')
+      .setDescription('Tag een chauffeur (optioneel)')
+      .setRequired(false)
+  )
+
+  .addStringOption(option =>
+    option.setName('locatie')
+      .setDescription('Typ een land (autocomplete) of laat leeg voor Random')
+      .setRequired(false)
+      .setAutocomplete(true)
+  )
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
