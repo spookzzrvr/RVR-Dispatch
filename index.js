@@ -63,8 +63,8 @@ const commands = [
         .setRequired(true)
         .addChoices(
           { name: 'Random', value: 'random' },
-          { name: 'Kort (0–400 km)', value: 'kort' },
-          { name: 'Midden (400–900 km)', value: 'midden' },
+          { name: 'Kort (0-400 km)', value: 'kort' },
+          { name: 'Midden (400-900 km)', value: 'midden' },
           { name: 'Lang (900+ km)', value: 'lang' }
         )
     )
