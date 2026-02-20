@@ -189,3 +189,7 @@ app.get("/", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("Web server actief voor Render.");
 });
+
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
