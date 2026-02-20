@@ -16,7 +16,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const locationsPath = path.join(__dirname, 'locations.json');
 let LOCATIONS = [];
 try {
-  LOCATIONS = JSON.parse(fs.readFileSync(locationsPath, 'utf8'));
+  LOCATIONS = JSON.parse(fs.readFileSync(locationsPath, 'utf8')).sort();
   if (!Array.isArray(LOCATIONS) || LOCATIONS.length === 0) throw new Error('locations.json leeg/ongeldig');
 } catch (e) {
   console.error('❌ locations.json fout:', e.message);
