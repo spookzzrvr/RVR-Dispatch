@@ -178,3 +178,14 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.TOKEN);
+// --- Express server voor Render (gratis Web Service fix) ---
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("RVR Dispatch Bot is running.");
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Web server actief voor Render.");
+});
